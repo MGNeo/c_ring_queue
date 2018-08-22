@@ -27,8 +27,8 @@ int main(int argc, char **argv)
     size_t value = 0;
     while (1)
     {
-        // Вставка в очередь от одного до шести элементов.
-        const size_t count = 1 + rand() % 6;
+        // Добавление в очередь от одного до четырех элементов.
+        size_t count = 1 + rand() % 4;
         for (size_t i = 0; i < count; ++i, ++value)
         {
             size_t *data = (size_t*)malloc(sizeof(size_t));
@@ -37,7 +37,17 @@ int main(int argc, char **argv)
         }
 
         // Вывод содержимого.
-        printf("insert count: %Iu\n", count);
+        printf("push count: %Iu\n", count);
+        c_ring_queue_for_each(ring_queue, print);
+
+        // Удаление из очереди от одного до трех элементов.
+        count = 1 + rand() % 3;
+        for (size_t i = 0; i < count; ++i)
+        {
+            c_ring_queue_pop(ring_queue, free);
+        }
+        // Вывод содержимого.
+        printf("pop count: %Iu\n", count);
         c_ring_queue_for_each(ring_queue, print);
 
         getchar();

@@ -123,7 +123,6 @@ ptrdiff_t c_ring_queue_clear(c_ring_queue *const _ring_queue,
         // Идем по элементам в порядке очереди до тех пор, пока элементы есть.
         while (_ring_queue->count > 0)
         {
-            // Удаляем.
             _del_data( _ring_queue->data[_ring_queue->pop_pos] );
             // Уменьшаем кол-во имеющихся элементов.
             --_ring_queue->count;
@@ -138,9 +137,10 @@ ptrdiff_t c_ring_queue_clear(c_ring_queue *const _ring_queue,
     return 1;
 }
 
-// Добавляет элемент в конец кольцевой очереди.
+// Добавляет элемент в конец очереди.
 // В случае успеха возвращает > 0, данные захватываются кольцевой очередью.
 // В случае ошибки возвращает < 0, данные не захватываются кольцевой очередью.
+// Если перед добавлением элемента очередь была заполнена, наиболее старый элемент затирается.
 ptrdiff_t c_ring_queue_push(c_ring_queue *const _ring_queue,
                             const void *const _data,
                             void (*const _del_data)(void *const _data))
@@ -154,7 +154,7 @@ ptrdiff_t c_ring_queue_push(c_ring_queue *const _ring_queue,
         return -2;
     }
 
-    // Контроль затирания, если очередь полностью заполнена.
+    // Если в очереди нет свободного места, затираем самый старый элемент.
     if (_ring_queue->count == _ring_queue->capacity)
     {
         // Если специальная функция удаления задана, вызываем ее.
@@ -164,8 +164,9 @@ ptrdiff_t c_ring_queue_push(c_ring_queue *const _ring_queue,
         }
         // Сдвигаем позицию вынимания.
         ring_increment(&_ring_queue->pop_pos, _ring_queue->capacity);
-        // Уменьшаем кол-во элементов.
-        --_ring_queue->count;
+    } else {
+        // Если в очереди есть место, увеличиваем счетчик элементов.
+        ++_ring_queue->count;
     }
 
     // Захватываем данные в позицию вставки.
@@ -174,28 +175,30 @@ ptrdiff_t c_ring_queue_push(c_ring_queue *const _ring_queue,
     // Сдвигаем позицию вставки.
     ring_increment(&_ring_queue->push_pos, _ring_queue->capacity);
 
-    // Увеличиваем количество элементов.
-    ++_ring_queue->count;
-
     return 1;
 }
 
-// Вытаскивает из начала очереди элемент.
-// В случае успеха, возвращает вытащенный элемент, кольцевая очередь перестает владеть вытащенными данными.
-// Если очередь пуста, или возникла ошибка, возвращает NULL.
-void *c_ring_queue_pop(c_ring_queue *const _ring_queue)
+// Вынимает элемент из начала очереди.
+// В случае успеха, возвращает > 0, очередь перестает владеть элементом.
+// Если очередь пуста, возвращает 0.
+// В случае ошибки возвращает < 0.
+ptrdiff_t c_ring_queue_pop(c_ring_queue *const _ring_queue,
+                           void (*const _del_data)(void *const _data))
 {
     if (_ring_queue == NULL)
     {
-        return NULL;
+        return -1;
     }
 
     if (_ring_queue->count == 0)
     {
-        return NULL;
+        return 0;
     }
 
-    void *pop_data = _ring_queue->data[_ring_queue->pop_pos];
+    if (_del_data != NULL)
+    {
+        _del_data(_ring_queue->data[_ring_queue->pop_pos]);
+    }
 
     // Смещаем позицию вытаскивания.
     ring_increment(&_ring_queue->pop_pos, _ring_queue->capacity);
@@ -203,11 +206,10 @@ void *c_ring_queue_pop(c_ring_queue *const _ring_queue)
     // Уменьшаем количество элементов в кольцевой очереди.
     --_ring_queue->count;
 
-    return pop_data;
+    return 1;
 }
 
 // Обходит все элементы кольцевой очереди и выполняет над ними заданные действия.
-// Функция действия не должна удалять данные, но может их менять.
 // Если функция удаления не задана, это считается ошибкой.
 // Элементы обходятся в порядке очереди.
 // В случае успешного обхода возвращает > 0.
@@ -233,7 +235,7 @@ ptrdiff_t c_ring_queue_for_each(c_ring_queue *const _ring_queue,
 
     for (size_t i = 0, pos = _ring_queue->pop_pos;
          i < _ring_queue->count;
-         ring_increment(&pos, _ring_queue->capacity), ++i)
+         ++i, ring_increment(&pos, _ring_queue->capacity))
     {
         _action_data(_ring_queue->data[pos]);
     }
