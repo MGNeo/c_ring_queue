@@ -14,32 +14,40 @@ struct s_c_ring_queue
     void **data;
 };
 
+// Если расположение задано, в него помещается код.
+static void error_set(size_t *const _error,
+                      const size_t _code)
+{
+    if (_error != NULL)
+    {
+        *_error = _code;
+    }
+}
+
 // Кольцевой инкремент, удерживающий результат в интервале [0; _max).
 static void ring_increment(size_t *const _value,
                            const size_t _max)
 {
-    if (_value == NULL)
+    if (_value != NULL)
     {
-        return;
+        ++*_value;
+        if (*_value >= _max)
+        {
+            *_value -= _max;// Вычитание универсальнее, чем = 0.
+        }
     }
-
-    ++*_value;
-    if (*_value >= _max)
-    {
-        *_value -= _max;// Вычитание универсальнее, чем = 0.
-    }
-
-    return;
 }
 
 // Создает кольцевую очередь.
-// Не позволяет создать кольцевую очередь с буфером нулевой длины.
-// В случае успеха возвращает указатель на созданную очередь.
-// В случае ошибки возвращает NULL.
-c_ring_queue *c_ring_queue_create(const size_t _capacity)
+// Не позволяет создать кольцевую очередь с нулевой емкостью.
+// В случае ошибки возвращает NULL, и _error != NULL, в заданное расположение помещается
+// код причины ошибки (> 0).
+c_ring_queue *c_ring_queue_create(const size_t _capacity,
+                                  size_t *const _error)
 {
     if (_capacity == 0)
     {
+        error_set(_error, 1);
         return NULL;
     }
 
@@ -50,6 +58,7 @@ c_ring_queue *c_ring_queue_create(const size_t _capacity)
     if ( (new_data_size == 0) ||
          (new_data_size / _capacity != sizeof(void*)) )
     {
+        error_set(_error, 2);
         return NULL;
     }
 
@@ -59,16 +68,18 @@ c_ring_queue *c_ring_queue_create(const size_t _capacity)
     // Проконтролируем успешность выделения памяти.
     if (new_data == NULL)
     {
+        error_set(_error, 3);
         return NULL;
     }
 
     // Попытаемся выделить память под кольцевую очередь.
-    c_ring_queue *const new_ring_queue = (c_ring_queue*)malloc(sizeof(c_ring_queue));
+    c_ring_queue *const new_ring_queue = malloc(sizeof(c_ring_queue));
 
     // Проконтролируем успешность выделения памяти.
     if (new_ring_queue == NULL)
     {
         free((void**)new_data);
+        error_set(_error, 4);
         return NULL;
     }
 
@@ -245,11 +256,16 @@ ptrdiff_t c_ring_queue_for_each(c_ring_queue *const _ring_queue,
 }
 
 // Возвращает количество элементов в кольцевой очереди.
-// В случае ошибки возвращает 0.
-size_t c_ring_queue_count(const c_ring_queue *const _ring_queue)
+// В случае ошибки возвращает 0, и если _error != NULL, в заданное расположение помещается
+// код причины ошибки (> 0).
+// Так как функция может возвращать 0 и в случае успеха, и в случае ошибки, для детектирования ошибки
+// перед вызовом функции необходимо поместить 0 в заданное расположение ошибки.
+size_t c_ring_queue_count(const c_ring_queue *const _ring_queue,
+                          size_t *const _error)
 {
     if (_ring_queue == NULL)
     {
+        error_set(_error, 1);
         return 0;
     }
 

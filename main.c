@@ -3,8 +3,6 @@
 
 #include "c_ring_queue.h"
 
-// Проверка возвращаемых значений не выполняется для упрощения.
-
 // Функция печати элемента кольцевой очереди.
 void print(void *const _data)
 {
@@ -13,47 +11,81 @@ void print(void *const _data)
         return;
     }
 
-    const size_t data = *( (size_t*) _data);
-    printf("%Iu\n", data);
+    const float data = *( (float*) _data);
+    printf("%f\n", data);
 
     return;
 }
 
 int main(int argc, char **argv)
 {
+    size_t error;
+    c_ring_queue *ring_queue;
+
     // Создание кольцевой очереди емкостью 5.
-    c_ring_queue *const ring_queue = c_ring_queue_create(5);
-
-    size_t value = 0;
-    while (1)
+    ring_queue = c_ring_queue_create(5, &error);
+    // Если возникла ошибка, покажем ее.
+    if (ring_queue == NULL)
     {
-        // Добавление в очередь от одного до четырех элементов.
-        size_t count = 1 + rand() % 4;
-        for (size_t i = 0; i < count; ++i, ++value)
-        {
-            size_t *data = (size_t*)malloc(sizeof(size_t));
-            *data = value;
-            c_ring_queue_push(ring_queue, data, free);
-        }
-
-        // Вывод содержимого.
-        printf("push count: %Iu\n", count);
-        c_ring_queue_for_each(ring_queue, print);
-
-        // Удаление из очереди от одного до трех элементов.
-        count = 1 + rand() % 3;
-        for (size_t i = 0; i < count; ++i)
-        {
-            c_ring_queue_pop(ring_queue, free);
-        }
-        // Вывод содержимого.
-        printf("pop count: %Iu\n", count);
-        c_ring_queue_for_each(ring_queue, print);
-
+        printf("create error: %Iu\n", error);
+        printf("Program end.\n");
         getchar();
+        return -1;
     }
 
-    //c_ring_queue_delete(ring_queue, free);
+    // Добавим в начало очереди 7 элементов.
+    for (size_t i = 0; i < 7; ++i)
+    {
+        // Попытаемся выделить память под элемент.
+        float *const data = malloc(sizeof(float));
+        // Если память выделить не удалось, сообщаем об этом.
+        if (data == NULL)
+        {
+            printf("malloc(): NULL\n");
+            printf("Program end.\n");
+            getchar();
+            return -2;
+        }
+        // Инициализируем элемент.
+        *data = i;
+        // Добавляем элемент в начало очереди.
+        const ptrdiff_t r_code = c_ring_queue_push(ring_queue, data, free);
+        // Если возникла ошибка, покажем ее.
+        if (r_code < 0)
+        {
+            printf("push error, r_code: %Id\n", r_code);
+            printf("Program end.\n");
+            getchar();
+            return -3;
+        }
+    }
 
+    // Используя обход кольцевой очереди, покажем содержимое каждого элемента.
+    {
+        const ptrdiff_t r_code = c_ring_queue_for_each(ring_queue, print);
+        // Если возникла ошибка, покажем ее.
+        if (r_code < 0)
+        {
+            printf("for each error, r_code: %Id\n", r_code);
+            printf("Program end.\n");
+            getchar();
+            return -4;
+        }
+    }
+
+    // Удалим кольцевую очередь.
+    {
+        const ptrdiff_t r_code = c_ring_queue_delete(ring_queue, free);
+        // Если возникла ошибка, покажем ее.
+        if (r_code < 0)
+        {
+            printf("delete error, r_code: %Id\n", r_code);
+            printf("Program end.\n");
+            getchar();
+            return -5;
+        }
+    }
+
+    getchar();
     return 0;
 }
